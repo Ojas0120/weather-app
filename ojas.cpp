@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+#include <sstream>
 #include <curl/curl.h>
 #include <json/json.h>  // Requires jsoncpp library
 
@@ -16,7 +17,6 @@ std::string fetchWeatherData(const std::string& city, const std::string& apiKey)
     CURLcode res;
     std::string response;
 
-    // OpenWeatherMap API URL
     std::string url = "http://api.openweathermap.org/data/2.5/weather?q=" + city + "&appid=" + apiKey + "&units=metric";
 
     curl = curl_easy_init();
@@ -25,7 +25,15 @@ std::string fetchWeatherData(const std::string& city, const std::string& apiKey)
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
         res = curl_easy_perform(curl);
+        
+        if (res != CURLE_OK) {
+            std::cerr << "cURL Error: " << curl_easy_strerror(res) << std::endl;
+            response.clear();
+        }
+
         curl_easy_cleanup(curl);
+    } else {
+        std::cerr << "Failed to initialize cURL.\n";
     }
 
     return response;
@@ -43,6 +51,12 @@ void parseWeatherData(const std::string& jsonData) {
         return;
     }
 
+    // Check if API returned an error
+    if (root.isMember("cod") && root["cod"].asInt() != 200) {
+        std::cerr << "Error from API: " << root["message"].asString() << std::endl;
+        return;
+    }
+
     std::string city = root["name"].asString();
     std::string description = root["weather"][0]["description"].asString();
     double temperature = root["main"]["temp"].asDouble();
@@ -56,7 +70,7 @@ void parseWeatherData(const std::string& jsonData) {
 
 int main() {
     std::string city;
-    std::string apiKey = "YOUR_API_KEY";  // Replace with your API key
+    std::string apiKey = "YOUR_API_KEY";  // Replace with your OpenWeatherMap API key
 
     std::cout << "Enter city name: ";
     std::getline(std::cin, city);
